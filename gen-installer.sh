@@ -12,6 +12,8 @@ export USE
 COMMON_FLAGS="-Os -pipe"
 
 export COMMON_FLAGS
+export VIDEO_CARDS=""
+export INPUT_DEVICES="evdev synaptics libinput"
 
 
 emerge --update --deep --ask --newuse @world
