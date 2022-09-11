@@ -22,7 +22,7 @@ cp boot-firefox.sh root0.mounted
 bash mount.sh root0.mounted bash /boot-firefox.sh
 
 mkdir initrd
-cd root0.8g 
+cd root0.8g
 cpio -p -v -d  -m -0 < ./touch_files.txt ../initrd
 cd ..
 umount root0.mounted
