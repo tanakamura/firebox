@@ -1,0 +1,8 @@
+linux-*
+touch_files.txt
+*.img
+*.zstd
+*.lzma
+OVMF.fd
+bzImage
+

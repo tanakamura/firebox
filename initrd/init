@@ -1,0 +1,19 @@
+#!/bin/sh
+
+export PATH=/sbin:/usr/sbin:/bin:/usr/bin:$PATH
+export HOME=/root
+
+mount -t proc proc /proc
+mount -t sysfs sys /sys
+mount -t tmpfs none /run
+
+mount -t devtmpfs none /dev
+mkdir -p /dev/pts
+mkdir -p /dev/shm
+mount -t devpts none /dev/pts
+mount -t tmpfs none /dev/shm
+
+busybox mdev -d
+
+xinit
+sh
