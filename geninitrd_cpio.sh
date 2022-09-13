@@ -3,9 +3,13 @@ set -xe -o pipefail
 
 FIREBOX=$(readlink -f $(dirname "$0"))
 
+make -C firebox/tools
+cp firebox/tools/init initrd
+
 cd initrd
-cp ${FIREBOX}/init_root.sh .
+cp ${FIREBOX}/initrd/root/.xinitrc root/.xinitrc
 mkdir -p etc/X11/xorg.conf.d
+
 
 cp ${FIREBOX}/xorg.conf.d/*.conf etc/X11/xorg.conf.d
 

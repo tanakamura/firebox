@@ -1,0 +1,6 @@
+*.o
+*.d
+firebox-init
+init
+genxorgconf
+server-test
