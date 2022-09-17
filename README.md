@@ -10,3 +10,4 @@
 7. chroot ぬける
 8. geninitrd_root.sh
 9. geninitrd_cpio.sh
+10. linu-5.19.8 に firebox.linux.conf を入れてビルド (CONFIG_INITRAMFS_SOURCE="/mnt/storage/gentoo/initrd"だけ変更してください)
