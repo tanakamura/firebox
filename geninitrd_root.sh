@@ -18,12 +18,17 @@ cd root0
 rm -rf root/.mozilla root/.cache root/.dbus root/.config
 chmod a+r root/.*
 set +e
-cpio -p -v -d  -m -0 < ../firebox/touch_files.txt ../initrd
+cat ../firebox/touch_files.txt | cpio -p -v -d  -m -0 ../initrd
+sed s/^/./g < ../firebox/additional_files | cpio -p -v -d  -m ../initrd 
 install -m 755 ../firebox/initrd/init ../initrd
 cd ..
 
 rm initrd/bin/sh
 cp firebox/init_root.sh initrd
+
+pushd initrd
+cat ../firebox/remove-list.txt | xargs rm
+popd
 
 chroot initrd /bin/busybox --install
 
@@ -53,3 +58,9 @@ do
 
     i=`expr $i + 1`
 done
+
+make -C firebox/tools
+cp firebox/tools/init initrd
+
+rsync -arv firebox/initrd/ initrd
+chown -R root:root initrd

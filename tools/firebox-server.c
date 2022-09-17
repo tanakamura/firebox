@@ -120,7 +120,7 @@ server_thread_func(void *args)
 
         if (strcmp(path,"/") == 0) {
             send_200(client);
-            SEND_CONST(client, "<html><head><meta charset=\"utf-8\"></head>><body><p>Welcome to FireBox!!</p><p>ようこそ！</p></body></html>");
+            SEND_CONST(client, "<html><head><meta charset=\"utf-8\"></head><body><p>Welcome to FireBox!!</p><p>ようこそ！</p></body></html>");
         } else {
             send_404(client);
         }

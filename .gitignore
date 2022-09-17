@@ -1,5 +1,6 @@
 linux-*
 touch_files.txt
+additional_files
 *.img
 *.zstd
 *.lzma

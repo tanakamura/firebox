@@ -6,7 +6,7 @@ USE0="$USE0 -doc -man -gtk-doc -cups -sysprof -colord -test -acl -zstd -mime ncu
 USE0="$USE0 -gmp-autoupdate -xattr -python -cairo -introspection -vala -egl -gles2 -icu -clang -wayland -llvm -crypt"
 USE0="$USE0 -snapshot -examples -system-jpeg -system-harfbuzz -system-av1 -system-libvpx -system-webp -system-libevent -pulseaudio"
 USE0="$USE0 -openh264 -encode -gnutls -binutils-plugin -libffi -asan -cfi -dfsan -gwp-asan -hwasan -libfuzzer -lsan -msan -safestack -scudo -tsan -ubsan"
-USE0="$USE0 -static-analyzer -memprof -compiler-rt -profile -xray -sanitize -e2fsprog"
+USE0="$USE0 -static-analyzer -memprof -compiler-rt -profile -xray -sanitize -e2fsprog -dbus"
 USE0="$USE0 X minimal -gdbm evdev udev xvfb lto kmod"
 
 export USE=$USE0
