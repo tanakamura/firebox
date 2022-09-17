@@ -64,3 +64,4 @@ cp firebox/tools/init initrd
 
 rsync -arv firebox/initrd/ initrd
 chown -R root:root initrd
+chmod a+rw initrd/usr/lib64/misc/utempter/utempter

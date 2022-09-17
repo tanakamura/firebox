@@ -65,7 +65,6 @@ int main(int argc, char **argv)
     puts("Welcome to FireBox system!");
     system("/sbin/udevd -d");
     system("/sbin/udevadm trigger");
-    sleep(1);
 
     start_firebox_server();
 
