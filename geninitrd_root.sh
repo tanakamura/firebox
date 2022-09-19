@@ -59,7 +59,11 @@ do
     i=`expr $i + 1`
 done
 
-make -C firebox/tools
+#make -C firebox/tools
+pushd firebox/tools/rinit
+
+cargo rustc --release -- -C prefer-dynamic
+
 cp firebox/tools/init initrd
 
 rsync -arv firebox/initrd/ initrd
