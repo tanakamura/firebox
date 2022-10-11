@@ -20,14 +20,17 @@ fn main() -> std::io::Result<()> {
         if true_init {
             setenv(cs!("PATH"), cs!("/sbin:/usr/sbin:/bin:/usr/bin"), 1);
             setenv(cs!("HOME"), cs!("/root"), 1);
-
+            setenv(cs!("XDG_RUNTIME_DIR"), cs!("/run/user/0"), 1);
 
             assert_eq!(mount(cs!("none"), cs!("/proc"), cs!("proc"), 0, std::ptr::null()), 0);
             assert_eq!(mount(cs!("none"), cs!("/sys"), cs!("sysfs"), 0, std::ptr::null()), 0);
-            assert_eq!(mount(cs!("none"), cs!("/dev"), cs!("devtmpfs"), 0, std::ptr::null()), 0);
+            mount(cs!("none"), cs!("/dev"), cs!("devtmpfs"), 0, std::ptr::null());
 
             mkdir(cs!("/dev/pts"), 0o0777);
             mkdir(cs!("/dev/shm"), 0o0777);
+            mkdir(cs!("/run"), 0o0777);
+            mkdir(cs!("/run/user"), 0o0777);
+            mkdir(cs!("/run/user/0"), 0o0700);
 
             assert_eq!(mount(cs!("none"), cs!("/dev/pts"), cs!("devpts"), 0, std::ptr::null()), 0);
             assert_eq!(mount(cs!("none"), cs!("/dev/shm"), cs!("tmpfs"), 0, std::ptr::null()), 0);
@@ -65,7 +68,7 @@ fn main() -> std::io::Result<()> {
                     }
                 }
             }
-            assert_eq!(setsid(), 0);
+            assert_ne!(setsid(), -1);
             assert_eq!(ioctl(0, TIOCSCTTY, 1), 0);
 
             assert_eq!(system(cs!("/sbin/udevd -d")), 0);
@@ -77,11 +80,14 @@ fn main() -> std::io::Result<()> {
             if true_init {
                 setsid();
                 let nullfd = open(cs!("/dev/null"), O_WRONLY);
-                dup2(nullfd, 1);
-                dup2(nullfd, 2);
+                //dup2(nullfd, 1);
+                //dup2(nullfd, 2);
                 close(nullfd);
             }
-            execlp(cs!("xinit"), cs!("xinit"), cs!("--"), cs!(":2"), std::ptr::null::<*const i8>());
+            execlp(cs!("dbus-launch"), cs!("dbus-launch"),
+                   cs!("seatd-launch"), cs!("--"),
+                   cs!("Hyprland"), cs!("--i-am-really-stupid"),
+                   std::ptr::null::<*const i8>());
             _exit(EXIT_FAILURE);
         }
         assert_ne!(winsys_pid, -1);

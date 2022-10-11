@@ -14,6 +14,8 @@ mount -t tmpfs none tmp
 mkdir -p firebox
 mount -o bind ../firebox firebox
 
+export PATH=/sbin:/usr/sbin:/bin:/usr/bin
+
 set +e
 chroot "." "$@"
 umount firebox

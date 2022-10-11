@@ -1,0 +1,17 @@
+{
+    "position": "bottom",
+    "height": 30,
+    "spacing": 4, // Gaps between modules (4px)
+    "modules-left": ["sway/workspaces", "wlr/taskbar"],
+    "modules-right": ["clock"],
+    "wlr/taskbar": {
+       "format": "{icon} {title}",
+    },
+    "clock": {
+        // "timezone": "America/New_York",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
+        "format": "{:%Y-%m-%d %H:%M:%S}",
+        "interval": 10
+    }
+
+}

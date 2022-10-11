@@ -1,13 +1,10 @@
 set -xe -o pipefail
 
-xhost +local:
-
-make -C firebox/tools
+#xhost +local:
 
 root=$1
 shift
 cd $root
-
 
 mkdir -p firebox
 mkdir -p run/udev
