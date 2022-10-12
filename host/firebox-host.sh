@@ -25,7 +25,7 @@ mount_root () {
     sudo mount -o bind /run $rootpath/run
     sudo mount -t tmpfs none $rootpath/tmp
     sudo mkdir -p $rootpath/firebox
-    sudo mount -o bind ../firebox $rootpath/firebox
+    sudo mount -o bind $firebox_path $rootpath/firebox
 }
 
 unmount_root () {
@@ -43,7 +43,7 @@ unmount_root () {
 
 chroot_to_gentoo () {
     mount_root
-    sudo chroot $rootpath /bin/bash /firebox/guest/guest-entry.sh
+    sudo chroot $rootpath /bin/bash /firebox/guest/guest-entry.sh $@
     unmount_root
 }
 
@@ -59,9 +59,8 @@ firebox_initrd_nspawn () {
 }
 
 run_emerge () {
-    mount_root
-    sudo chroot $rootpath /bin/bash /firebox/guest/guest-entry.sh bash /firebox/guest/emerge.sh
-    unmount_root
+    #firebox_nspawn /firebox/guest/emerge.sh
+    chroot_to_gentoo /firebox/guest/emerge.sh
 }
 
 firebox_reload () {
@@ -140,7 +139,15 @@ extract_touched_files () {
     sudo rm -rf $initrd/usr/share/bash-completion
     sudo rm -rf $initrd/usr/lib64/pkgconfig
     sudo rm -rf $initrd/usr/include
+    sudo rm -rf $initrd/usr/share/cursors
+    sudo rm -rf $initrd/usr/share/icons
+    #sudo rm -rf $initrd/usr/lib/llvm
+    sudo rm -rf $initrd/usr/lib64/librsvg-2.so.2.48.0
+    sudo rm -rf $initrd/etc/udev/hwdb.d
+    sudo rm -rf $initrd/etc/udev/hwdb.bin
+    sudo rm -rf $initrd/usr/share/fonts/misc
     sudo rm $initrd/etc/firebox.json
+
     popd
 
     sudo rsync -arAHX $firebox_path/initrd/ $initrd
@@ -155,7 +162,6 @@ extract_touched_files () {
     echo initrd : $(($bytes / (1024*1024)))MiB
 }
 
-
 install_rinit () {
     pushd $firebox_path/tools/rinit
     cargo build --release
@@ -169,6 +175,13 @@ install_rinit () {
 run_initrd () {
     pushd $firebox_path/work
     qemu-system-x86_64 -kernel linux/arch/x86/boot/bzImage -initrd firebox_initrd.zstd -m 2G -serial mon:stdio -nic bridge,id=br0 -smp 4 -machine type=q35,accel=kvm -append "console=ttyS0" -display gtk,gl=on -device virtio-vga-gl
+    popd
+}
+
+save_kernel_config () {
+    pushd $firebox_path/work/linux
+    make savedefconfig
+    cp defconfig ../../configs
     popd
 }
 

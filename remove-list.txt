@@ -1,4 +1,4 @@
 usr/share/fonts/sazanami/sazanami-mincho.ttf
 usr/share/fonts/sazanami/sazanami-gothic.ttf
 usr/share/fonts/vlgothic/VL-Gothic-Regular.ttf
-usr/lib/locale/locale-archive
+
