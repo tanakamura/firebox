@@ -25,15 +25,26 @@ struct Config {
 }
 
 unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Result<pid_t> {
-    let pid = fork();
-    if pid > 0 {
-        return Ok(pid);
-    }
-    assert_ne!(pid, -1);
+    let mut cmds = Vec::new();
 
-    // xxx : allocating memory in child process is unsafe..
+    cmds.push(vec![
+        cs!("seatd-launch"),
+        cs!("--"),
+        cs!("dbus-launch"),
+        cs!("Hyprland"),
+        cs!("--i-am-really-stupid"),
+        std::ptr::null(),
+    ]);
 
+    cmds.push(vec![
+        cs!("/usr/libexec/iwd"),
+        std::ptr::null(),
+    ]);
+
+
+    let mut ttydev = None;
     if true_init {
+        cmds.push( vec![cs!("dhcpcd"), cs!("eth0"), std::ptr::null()] );
         let fp = File::open("/sys/class/tty/console/active");
         if let Ok(fp) = fp {
             let mut reader = BufReader::new(fp);
@@ -43,20 +54,33 @@ unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Re
             if let Ok(len) = len {
                 if len > 0 {
                     line.truncate(len - 1);
-                    let ttydev = CString::new("/dev/".to_owned() + &line).unwrap();
-                    let fd = open(ttydev.as_ptr(), O_RDWR);
-
-                    if fd >= 0 {
-                        dup2(fd, 0);
-                        dup2(fd, 1);
-                        dup2(fd, 2);
-
-                        close(fd);
-                    }
+                    ttydev = Some(CString::new("/dev/".to_owned() + &line).unwrap());
                 }
             }
         }
+    }
 
+    let pid = fork();
+    if pid > 0 {
+        return Ok(pid);
+    }
+    assert_ne!(pid, -1);
+
+    // memo : should not alloate in child process
+
+    if let Some(ttydev) = ttydev {
+        let fd = open(ttydev.as_ptr(), O_RDWR);
+
+        if fd >= 0 {
+            dup2(fd, 0);
+            dup2(fd, 1);
+            dup2(fd, 2);
+
+            close(fd);
+        }
+    }
+
+    if true_init {
         assert_ne!(setsid(), -1);
         assert_eq!(ioctl(0, TIOCSCTTY, 1), 0);
 
@@ -65,18 +89,8 @@ unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Re
         assert_eq!(system(cs!("dbus-daemon --system")), 0);
     }
 
-    unsafe fn spawn_commands(coms: Vec<Vec<&str>>, orig_sig: *const sigset_t) {
+    unsafe fn spawn_commands(coms: Vec<Vec<*const i8>>, orig_sig: *const sigset_t) {
         for c in &coms {
-            let mut vec = Vec::new();
-            let mut ptrvec = Vec::new();
-            for s in c {
-                let c = CString::new(*s);
-                ptrvec.push(c.as_ref().unwrap().as_ptr());
-                vec.push(c);
-            }
-
-            ptrvec.push(std::ptr::null());
-
             let pid = fork();
             if pid > 0 {
                 continue;
@@ -86,9 +100,10 @@ unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Re
             let null_fd = open(cs!("/dev/null"), O_RDONLY);
             dup2(null_fd, 1);
             dup2(null_fd, 2);
+            close(null_fd);
 
             sigprocmask(SIG_SETMASK, orig_sig, std::ptr::null_mut());
-            execvp(ptrvec[0], ptrvec.as_ptr());
+            execvp(c[0], c.as_ptr());
         }
     }
 
@@ -107,7 +122,7 @@ unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Re
         coms.push( vec!["dhcpcd", "eth0"] )
     }
 
-    spawn_commands(coms, orig_sig);
+    spawn_commands(cmds, orig_sig);
 
     let sh_pid = fork();
     if sh_pid == 0 {
