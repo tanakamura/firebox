@@ -1,7 +1,7 @@
 use libc::{getpid, mount, mkdir, system, open, setsid, ioctl, TIOCSCTTY, setenv,
            O_RDWR, dup2, close, fork, execlp, execvp, _exit, EXIT_FAILURE, c_char, umount, sync, RB_POWER_OFF, reboot, EXIT_SUCCESS, waitpid,
            sigfillset, sigset_t, sigprocmask, SIG_SETMASK, pid_t, siginfo_t, sigwaitinfo,
-           CLD_EXITED, CLD_KILLED, CLD_DUMPED, c_int, SIGCHLD, SIGUSR1};
+           CLD_EXITED, CLD_KILLED, CLD_DUMPED, c_int, SIGCHLD, SIGUSR1, sleep, puts};
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::ffi::CString;
@@ -17,7 +17,7 @@ macro_rules! cs {
 
 unsafe fn run_spawner(orig_sig : *const sigset_t, true_init: bool) -> std::io::Result<pid_t> {
     let pid = fork();
-    if pid != 0 {
+    if pid > 0 {
         return Ok(pid);
     }
     assert_ne!(pid, -1);
@@ -56,29 +56,33 @@ unsafe fn run_spawner(orig_sig : *const sigset_t, true_init: bool) -> std::io::R
         assert_eq!(system(cs!("dbus-daemon --system")), 0);
     }
 
-    unsafe fn spawn_commands(coms: Vec< Vec<*const i8>>, orig_sig:*const sigset_t ) {
+    unsafe fn spawn_commands(coms: Vec< Vec<&str>>, orig_sig:*const sigset_t ) {
         for c in &coms {
-            let pid = fork();
-            if pid != 0 {
-                continue;
+            let mut vec = Vec::new();
+            let mut ptrvec = Vec::new();
+            for s in c {
+                let c = CString::new(*s);
+                ptrvec.push( c.as_ref().unwrap().as_ptr() );
+                vec.push(c);
             }
 
-            assert!(pid > 0);
+            ptrvec.push( std::ptr::null() );
+
+            let pid = fork();
+            if pid > 0 {
+                sleep(4);
+                continue;
+            }
+            assert_eq!(pid, 0);
 
             sigprocmask(SIG_SETMASK, orig_sig, std::ptr::null_mut());
-            execvp(c[0],
-                   c.as_ptr());
+            execvp(ptrvec[0], ptrvec.as_ptr());
         }
     }
 
-    let terminate = std::ptr::null::<*const i8>();
-    let coms = vec![vec![cs!("seatd-launch"), cs!("seatd-launch"), cs!("--"),
-                         cs!("dbus-launch"),
-                         cs!("Hyprland"), cs!("--i-am-really-stupid"),*terminate],
-
-                    vec![cs!("/usr/libexec/iwd"), cs!("/usr/libexec/iwd"), *terminate],
-
-                    vec![cs!("dhcpcd"), cs!("eth0"), *terminate],
+    let coms = vec![vec!["seatd-launch", "--", "dbus-launch", "Hyprland", "--i-am-really-stupid"],
+                    vec!["/usr/libexec/iwd"],
+                    vec!["dhcpcd", "eth0"],
     ];
 
     spawn_commands(
@@ -198,6 +202,7 @@ fn main() -> std::io::Result<()> {
         waitpid(spawner_pid, &mut spawner_st, 0);
 
         println!("bye!");
+        sleep(4);
 
         if true_init {
             umount(cs!("/dev/shm"));

@@ -3,7 +3,7 @@
 source /etc/profile
 env-update
 
-source /firebox/flags.sh
+source /firebox/guest/flags.sh
 
 if test "$#" != "0"
 then
