@@ -1,6 +1,7 @@
+#!/bin/bash
 set -xe -o pipefail
 
-source flags.sh
+source /firebox/guest/flags.sh
 
 A=--ask
 
