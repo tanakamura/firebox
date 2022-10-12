@@ -1,13 +1,11 @@
 # つくりかた
 (いくらか決め打ちで作ってる部分がまあだあります。おそらく私の手元以外で動かないです)
 
-1. つぶしてもいいgentoo環境をつくる
-2. そこへmount.shが動くように調整してchrootする
-3. gen-installer.sh を動かしてfirefoxと依存パッケージをビルド
-4. chroot ぬける
-5. find-required-files-host.sh で再度chroot
-6. その中でfind-required-files.shを動かす
-7. chroot ぬける
-8. geninitrd_root.sh
-9. geninitrd_cpio.sh
-10. linu-5.19.8 に firebox.linux.conf を入れてビルド (CONFIG_INITRAMFS_SOURCE="/mnt/storage/gentoo/initrd"だけ変更してください)
+1. つぶしてもいいgentoo環境imageをつくる。ext4 でフォーマットして、work/root0.8g に置く (8GiB推奨)
+2. source host/firebox-host.sh する
+3. run_emerge して環境をつくる
+4. install_rinit して /init を生成
+5. run_installer してファイルリストを作る
+6. extract_touched_files してファイルを集める
+7. configs/defconfig を使ってkernel build 
+10. できた initrd と bzImage でブート
