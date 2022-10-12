@@ -6,7 +6,8 @@ edition = "2021"
 [dependencies]
 tiny_http = "0.11"
 "libc" = "0.2"
-
+serde_json = "1.0"
+serde = {version="1.0", features=["derive"]}
 
 [profile.release]   # from min-size-rust
 opt-level = "z"     # Optimize for size.

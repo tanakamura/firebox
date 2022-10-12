@@ -1,13 +1,14 @@
 use libc::{
     _exit, c_char, c_int, close, dup2, execlp, execvp, fork, getpid, ioctl, mkdir, mount, open,
     pid_t, reboot, setenv, setsid, sigfillset, siginfo_t, sigprocmask, sigset_t, sigwaitinfo,
-    sleep, sync, system, umount, waitpid, CLD_DUMPED, CLD_EXITED, CLD_KILLED, EXIT_FAILURE,
-    EXIT_SUCCESS, O_RDWR, RB_POWER_OFF, SIGCHLD, SIGUSR1, SIG_SETMASK, TIOCSCTTY,
+    sync, system, umount, waitpid, CLD_DUMPED, CLD_EXITED, CLD_KILLED, EXIT_FAILURE,
+    EXIT_SUCCESS, O_RDWR, RB_POWER_OFF, SIGCHLD, SIGUSR1, SIG_SETMASK, TIOCSCTTY, O_RDONLY,
 };
 use std::ffi::CString;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::mem;
+use serde::Deserialize;
 
 mod server;
 
@@ -18,10 +19,9 @@ macro_rules! cs {
     };
 }
 
-enum Mode {}
-
-struct State {
-    mode: Mode,
+#[derive(Deserialize)]
+struct Config {
+    mode: String,
 }
 
 unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Result<pid_t> {
@@ -31,7 +31,7 @@ unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Re
     }
     assert_ne!(pid, -1);
 
-    server::start_server()?;
+    // xxx : allocating memory in child process is unsafe..
 
     if true_init {
         let fp = File::open("/sys/class/tty/console/active");
@@ -79,17 +79,20 @@ unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Re
 
             let pid = fork();
             if pid > 0 {
-                sleep(4);
                 continue;
             }
             assert_eq!(pid, 0);
+
+            let null_fd = open(cs!("/dev/null"), O_RDONLY);
+            dup2(null_fd, 1);
+            dup2(null_fd, 2);
 
             sigprocmask(SIG_SETMASK, orig_sig, std::ptr::null_mut());
             execvp(ptrvec[0], ptrvec.as_ptr());
         }
     }
 
-    let coms = vec![
+    let mut coms = vec![
         vec![
             "seatd-launch",
             "--",
@@ -98,35 +101,13 @@ unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Re
             "--i-am-really-stupid",
         ],
         vec!["/usr/libexec/iwd"],
-        vec!["dhcpcd", "eth0"],
     ];
 
-    spawn_commands(coms, orig_sig);
-
-    //    let winsys_pid = fork();
-    //    if winsys_pid == 0 {
-    //        sigprocmask(SIG_SETMASK, orig_sig, std::ptr::null_mut());
-    //        execlp(cs!("seatd-launch"), cs!("seatd-launch"), cs!("--"),
-    //               cs!("dbus-launch"),
-    //               cs!("Hyprland"), cs!("--i-am-really-stupid"),
-    //               //cs!("weston"),
-    //               std::ptr::null::<*const i8>());
-    //        _exit(EXIT_FAILURE);
-    //    }
-    //    assert_ne!(winsys_pid, -1);
-    //
-    //    let iwd_pid = fork();
-    //    if iwd_pid == 0 {
-    //        sigprocmask(SIG_SETMASK, orig_sig, std::ptr::null_mut());
-    //        execlp(cs!("/usr/libexec/iwd"), cs!("/usr/libexec/iwd"),
-    //               std::ptr::null::<*const i8>());
-    //        _exit(EXIT_FAILURE);
-    //    }
-    //    assert_ne!(iwd_pid, -1);
-
     if true_init {
-        assert_eq!(system(cs!("dhcpcd eth0")), 0);
+        coms.push( vec!["dhcpcd", "eth0"] )
     }
+
+    spawn_commands(coms, orig_sig);
 
     let sh_pid = fork();
     if sh_pid == 0 {
@@ -144,13 +125,28 @@ unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Re
     let mut sh_st = 0;
     waitpid(sh_pid, &mut sh_st, 0);
 
-    println!("sh exit");
-
-    _exit(EXIT_SUCCESS);
+    loop {
+        _exit(EXIT_SUCCESS);
+    }
 }
 
 fn main() -> std::io::Result<()> {
+    let config_file = File::open("/etc/firebox.json");
+    let mut config = Config { mode: "run".to_string() };
+
+    if let Ok(config_file) = config_file {
+        let reader = BufReader::new(config_file);
+
+        if let Ok(c) = serde_json::from_reader(reader) {
+            config = c;
+        }
+    }
+
     unsafe {
+        if config.mode == "installer" {
+            system(cs!("find / -mount -type f -print0 | xargs -0 touch -a -d 1980/01/01"));
+        }
+
         let true_init = getpid() == 1;
         println!("Welcome to FireBox system!");
 
@@ -184,6 +180,8 @@ fn main() -> std::io::Result<()> {
             mkdir(cs!("/dev/pts"), 0o0777);
             mkdir(cs!("/dev/shm"), 0o0777);
             mkdir(cs!("/run"), 0o0777);
+
+            mount(cs!("none"), cs!("/run"), cs!("tmpfs"), 0, std::ptr::null());
             mkdir(cs!("/run/dbus"), 0o0777);
             mkdir(cs!("/run/user"), 0o0777);
             mkdir(cs!("/run/user/1"), 0o0700);
@@ -213,6 +211,7 @@ fn main() -> std::io::Result<()> {
             assert_eq!(system(cs!("ip a add 127.0.0.1 dev lo")), 0);
         }
 
+        server::start_server()?;
         let spawner_pid = run_spawner(orig.as_ptr(), true_init)?;
 
         'wait_children: loop {
@@ -225,6 +224,7 @@ fn main() -> std::io::Result<()> {
             }
 
             let cur = cur.as_ptr();
+
             match (*cur).si_signo {
                 SIGCHLD => {
                     let mut st = mem::MaybeUninit::<c_int>::uninit();
@@ -252,7 +252,12 @@ fn main() -> std::io::Result<()> {
         waitpid(spawner_pid, &mut spawner_st, 0);
 
         println!("bye!");
-        sleep(4);
+
+        if config.mode == "installer" {
+            system(cs!(r#"find -L ./ -mount -not -name ".cache" -not -name ".mozilla" -not -amin +1000 -type f -print0 > /touch_files.txt"#));
+            system(cs!(r#"equery -C f eudev kmod | cut -d' ' -f1 > /additional_files.txt"#));
+        }
+
 
         if true_init {
             umount(cs!("/dev/shm"));
