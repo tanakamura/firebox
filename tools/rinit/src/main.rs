@@ -1,5 +1,5 @@
 use libc::{getpid, mount, mkdir, system, open, setsid, ioctl, TIOCSCTTY, setenv,
-           O_RDWR, dup2, close, fork, execlp, _exit, EXIT_FAILURE, c_char, umount, sync, RB_POWER_OFF, reboot, EXIT_SUCCESS, waitpid,
+           O_RDWR, dup2, close, fork, execlp, execvp, _exit, EXIT_FAILURE, c_char, umount, sync, RB_POWER_OFF, reboot, EXIT_SUCCESS, waitpid,
            sigfillset, sigset_t, sigprocmask, SIG_SETMASK, pid_t, siginfo_t, sigwaitinfo,
            CLD_EXITED, CLD_KILLED, CLD_DUMPED, c_int, SIGCHLD, SIGUSR1};
 use std::fs::File;
@@ -56,26 +56,55 @@ unsafe fn run_spawner(orig_sig : *const sigset_t, true_init: bool) -> std::io::R
         assert_eq!(system(cs!("dbus-daemon --system")), 0);
     }
 
-    let winsys_pid = fork();
-    if winsys_pid == 0 {
-        sigprocmask(SIG_SETMASK, orig_sig, std::ptr::null_mut());
-        execlp(cs!("seatd-launch"), cs!("seatd-launch"), cs!("--"),
-               cs!("dbus-launch"),
-               cs!("Hyprland"), cs!("--i-am-really-stupid"),
-               //cs!("weston"),
-               std::ptr::null::<*const i8>());
-        _exit(EXIT_FAILURE);
-    }
-    assert_ne!(winsys_pid, -1);
+    unsafe fn spawn_commands(coms: Vec< Vec<*const i8>>, orig_sig:*const sigset_t ) {
+        for c in &coms {
+            let pid = fork();
+            if pid != 0 {
+                continue;
+            }
 
-    let iwd_pid = fork();
-    if iwd_pid == 0 {
-        sigprocmask(SIG_SETMASK, orig_sig, std::ptr::null_mut());
-        execlp(cs!("/usr/libexec/iwd"), cs!("/usr/libexec/iwd"),
-               std::ptr::null::<*const i8>());
-        _exit(EXIT_FAILURE);
+            assert!(pid > 0);
+
+            sigprocmask(SIG_SETMASK, orig_sig, std::ptr::null_mut());
+            execvp(c[0],
+                   c.as_ptr());
+        }
     }
-    assert_ne!(iwd_pid, -1);
+
+    let terminate = std::ptr::null::<*const i8>();
+    let coms = vec![vec![cs!("seatd-launch"), cs!("seatd-launch"), cs!("--"),
+                         cs!("dbus-launch"),
+                         cs!("Hyprland"), cs!("--i-am-really-stupid"),*terminate],
+
+                    vec![cs!("/usr/libexec/iwd"), cs!("/usr/libexec/iwd"), *terminate],
+
+                    vec![cs!("dhcpcd"), cs!("eth0"), *terminate],
+    ];
+
+    spawn_commands(
+        coms, orig_sig
+    );
+
+//    let winsys_pid = fork();
+//    if winsys_pid == 0 {
+//        sigprocmask(SIG_SETMASK, orig_sig, std::ptr::null_mut());
+//        execlp(cs!("seatd-launch"), cs!("seatd-launch"), cs!("--"),
+//               cs!("dbus-launch"),
+//               cs!("Hyprland"), cs!("--i-am-really-stupid"),
+//               //cs!("weston"),
+//               std::ptr::null::<*const i8>());
+//        _exit(EXIT_FAILURE);
+//    }
+//    assert_ne!(winsys_pid, -1);
+//
+//    let iwd_pid = fork();
+//    if iwd_pid == 0 {
+//        sigprocmask(SIG_SETMASK, orig_sig, std::ptr::null_mut());
+//        execlp(cs!("/usr/libexec/iwd"), cs!("/usr/libexec/iwd"),
+//               std::ptr::null::<*const i8>());
+//        _exit(EXIT_FAILURE);
+//    }
+//    assert_ne!(iwd_pid, -1);
 
     if true_init {
         assert_eq!(system(cs!("dhcpcd eth0")), 0);

@@ -1,6 +1,6 @@
 use std::thread;
 use std::io::ErrorKind;
-use tiny_http;
+
 
 fn send_404(rq: tiny_http::Request) {
     let res = tiny_http::Response::from_string("404").with_status_code(404);
