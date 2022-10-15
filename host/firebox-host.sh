@@ -50,6 +50,13 @@ chroot_to_gentoo () {
 firebox_nspawn () {
     mount_root0
     sudo systemd-nspawn --bind $firebox_path:/firebox -D $rootpath /firebox/guest/guest-entry.sh $@
+    #sudo systemd-nspawn --bind $firebox_path:/firebox -D $rootpath -b
+    unmount_root0
+}
+
+firebox_nspawn_openrc () {
+    mount_root0
+    sudo systemd-nspawn --bind $firebox_path:/firebox -D $rootpath -b
     unmount_root0
 }
 
@@ -75,7 +82,8 @@ run_qemu () {
          -append "console=ttyS0 root=/dev/vda rw init=/init" \
          -drive id=disk,file=$file,if=virtio \
          -display gtk,gl=on \
-         -device virtio-vga-gl
+         -device virtio-vga-gl \
+         -device vfio-pci,host=0000:04:00.0
 }
 
 install_config () {
@@ -95,7 +103,7 @@ run_installer () {
 }
 
 test_installer () {
-    install_config run.json
+    install_config test_installer.json
 
     pushd $firebox_path/work
 

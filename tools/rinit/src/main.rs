@@ -19,9 +19,10 @@ macro_rules! cs {
     };
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize,Default)]
 struct Config {
     mode: String,
+    show_list: Option<i32>
 }
 
 unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Result<pid_t> {
@@ -81,6 +82,8 @@ unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Re
         assert_eq!(ioctl(0, TIOCSCTTY, 1), 0);
 
         assert_eq!(system(cs!("/sbin/udevd -d")), 0);
+        assert_eq!(system(cs!("/sbin/udevadm trigger --type=subsystems --action=add")), 0);
+        assert_eq!(system(cs!("/sbin/udevadm trigger --type=devices --action=add")), 0);
         assert_eq!(system(cs!("/sbin/udevadm trigger")), 0);
         assert_eq!(system(cs!("dbus-daemon --system")), 0);
     }
@@ -126,9 +129,7 @@ unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Re
 
 fn main() -> std::io::Result<()> {
     let config_file = File::open("/etc/firebox.json");
-    let mut config = Config {
-        mode: "run".to_string(),
-    };
+    let mut config :Config = Default::default();
 
     if let Ok(config_file) = config_file {
         let reader = BufReader::new(config_file);
@@ -268,6 +269,12 @@ fn main() -> std::io::Result<()> {
             system(cs!(
                 r#"find -L ./ -mount -not -name ".cache" -not -name ".mozilla" -not -amin +1000 -type f -print0 > /touch_files.txt"#
             ));
+
+            if let Some(_) = config.show_list {
+                system(cs!(
+                    r#"less /touch_files.txt"#
+                ));
+            }
             system(cs!(
                 r#"equery -C f eudev kmod | cut -d' ' -f1 > /additional_files.txt"#
             ));
