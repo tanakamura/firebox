@@ -5,10 +5,10 @@ USE0="$USE0 -gmp-autoupdate -xattr -cairo -vala -icu -clang -crypt"
 USE0="$USE0 -snapshot -examples -system-jpeg -system-harfbuzz -system-av1 -system-libvpx -system-webp -system-icu -system-libevent"
 USE0="$USE0 -openh264 -encode -gnutls -binutils-plugin -libffi -asan -cfi -dfsan -gwp-asan -hwasan -libfuzzer -lsan -msan -safestack -scudo -tsan -ubsan"
 USE0="$USE0 -static-analyzer -memprof -compiler-rt -profile -xray -sanitize -e2fsprog "
-USE0="$USE0 -ensurepip -python -llvm -pulseaudio -clang -elogind -modemmanager -wext -concheck -wifi"
+USE0="$USE0 -ensurepip -llvm -pulseaudio -clang -elogind -modemmanager -wext -concheck -wifi"
 
 USE0="$USE0 tinywl evdev udev lto kmod wayland gdbm iwd dbus egl gles2 postproc wayland-compositor introspection X osmesa alsa "
-USE0="$USE0 alsa"
+USE0="$USE0 alsa python"
 
 export USE=$USE0
 

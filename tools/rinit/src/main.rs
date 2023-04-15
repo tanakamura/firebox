@@ -6,9 +6,9 @@ use libc::{
 };
 use serde::Deserialize;
 use std::ffi::CString;
-use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::mem;
+use futures;
 
 mod server;
 
@@ -42,7 +42,7 @@ unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Re
     let mut ttydev = None;
     if true_init {
         cmds.push(vec![cs!("dhcpcd"), cs!("eth0"), std::ptr::null()]);
-        let fp = File::open("/sys/class/tty/console/active");
+        let fp = std::fs::File::open("/sys/class/tty/console/active");
         if let Ok(fp) = fp {
             let mut reader = BufReader::new(fp);
             let mut line = String::new();
@@ -84,7 +84,6 @@ unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Re
         assert_eq!(system(cs!("/sbin/udevd -d")), 0);
         assert_eq!(system(cs!("/sbin/udevadm trigger --type=subsystems --action=add")), 0);
         assert_eq!(system(cs!("/sbin/udevadm trigger --type=devices --action=add")), 0);
-        assert_eq!(system(cs!("/sbin/udevadm trigger")), 0);
         assert_eq!(system(cs!("dbus-daemon --system")), 0);
     }
 
@@ -128,7 +127,11 @@ unsafe fn run_spawner(orig_sig: *const sigset_t, true_init: bool) -> std::io::Re
 }
 
 fn main() -> std::io::Result<()> {
-    let config_file = File::open("/etc/firebox.json");
+    smol::block_on( async { main_async().await } )
+}
+
+async fn main_async() -> std::io::Result<()> {
+    let config_file = std::fs::File::open("/etc/firebox.json");
     let mut config :Config = Default::default();
 
     if let Ok(config_file) = config_file {
@@ -160,28 +163,38 @@ fn main() -> std::io::Result<()> {
             setenv(cs!("HOME"), cs!("/root"), 1);
             setenv(cs!("XDG_RUNTIME_DIR"), cs!("/run/user/1"), 1);
             setenv(cs!("LANG"), cs!("C.utf8"), 1);
+            setenv(cs!("LANG"), cs!("C.utf8"), 1);
+            setenv(cs!("GDK_IM_MODULE"), cs!("ibus"), 1);
+            setenv(cs!("GTK_IM_MODULE"), cs!("ibus"), 1);
+            setenv(cs!("QT_IM_MODULE"), cs!("ibus"), 1);
+            setenv(cs!("DefaultIMModule"), cs!("ibus"), 1);
+            setenv(cs!("XMODIFIERS"), cs!("@im=ibus"), 1);
 
-            assert_eq!(
-                mount(cs!("none"), cs!("/proc"), cs!("proc"), 0, std::ptr::null()),
-                0
-            );
-            assert_eq!(
-                mount(cs!("none"), cs!("/sys"), cs!("sysfs"), 0, std::ptr::null()),
-                0
-            );
-            mount(
-                cs!("none"),
-                cs!("/dev"),
-                cs!("devtmpfs"),
-                0,
-                std::ptr::null(),
-            );
+            fn to_cs(s:&str) -> CString {
+                CString::new(s).unwrap()
+            }
+
+            let mnt_table = vec![ ("/proc", "proc"),
+                                   ("/sys", "sysfs"),
+                                   ("/dev", "devtmpfs"),
+                                   ("/run", "tmpfs"),
+            ];
+
+            async unsafe fn mount_table(tbl: Vec< (&'static str,&'static str) >) {
+                let mnt_result = futures::future::join_all(
+                    tbl.iter().map( |v| smol::unblock(|| mount(cs!("none"), to_cs(v.0).as_ptr(), to_cs(v.1).as_ptr(), 0, std::ptr::null())) )
+                ).await;
+                for i in mnt_result {
+                    assert_eq!(i, 0);
+                }
+            }
+
+            mount_table(mnt_table).await;
 
             mkdir(cs!("/dev/pts"), 0o0777);
             mkdir(cs!("/dev/shm"), 0o0777);
             mkdir(cs!("/run"), 0o0777);
 
-            mount(cs!("none"), cs!("/run"), cs!("tmpfs"), 0, std::ptr::null());
             mkdir(cs!("/run/dbus"), 0o0777);
             mkdir(cs!("/run/user"), 0o0777);
             mkdir(cs!("/run/user/1"), 0o0700);
@@ -267,7 +280,7 @@ fn main() -> std::io::Result<()> {
 
         if config.mode == "installer" {
             system(cs!(
-                r#"find -L ./ -mount -not -name ".cache" -not -name ".mozilla" -not -amin +1000 -type f -print0 > /touch_files.txt"#
+                r#"find -L ./ -mount -not -name ".cache" -not -name ".mozilla" -not -amin +1000 -print0 > /touch_files.txt"#
             ));
 
             if let Some(_) = config.show_list {

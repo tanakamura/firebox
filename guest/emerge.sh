@@ -12,7 +12,7 @@ D=--deep
 export USE="$USE0"
 emerge $A --update --deep --newuse vlgothic gentoo-sources libpciaccess pciutils vlgothic iwd seatd mesa-progs
 emerge $A --update --newuse --deep mesa
-emerge $A --update vim busybox
+emerge $A --update vim busybox ibus-anthy
 emerge $A --oneshot --update sys-fs/eudev
 
 export ACCEPT_KEYWORDS=~amd64

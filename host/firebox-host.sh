@@ -1,4 +1,5 @@
-firebox_path=$( dirname -- $(readlink -f ${BASH_SOURCE} ) )/..
+this_script_path=$(readlink -f ${BASH_SOURCE:-$0})
+firebox_path=$( dirname -- $this_script_path )/..
 firebox_path=$(readlink -f $firebox_path)
 
 rootpath=$firebox_path/work/root
@@ -78,12 +79,18 @@ firebox_reload () {
 run_qemu () {
     file=$1
     qemu-system-x86_64 -kernel linux/arch/x86/boot/bzImage -m 2G -serial mon:stdio \
-         -nic bridge,id=br0 -smp 4 -machine type=q35,accel=kvm \
-         -append "console=ttyS0 root=/dev/vda rw init=/init" \
+         -smp 4 \
+         -append "console=ttyS0 root=/dev/vda rw" \
+         -machine type=q35,accel=kvm \
+         -nic bridge,id=br0 \
          -drive id=disk,file=$file,if=virtio \
-         -display gtk,gl=on \
-         -device virtio-vga-gl \
-         -device vfio-pci,host=0000:04:00.0
+
+#         -display gtk,gl=on \
+#         -device virtio-vga-gl \
+
+#         -device vfio-pci,host=0000:00:02.0 \
+#         -device virtio-vga-gl \
+
 }
 
 install_config () {
@@ -114,6 +121,8 @@ test_installer () {
 
     popd
 }
+
+
 
 extract_touched_files () {
     initrd=$firebox_path/work/initrd
@@ -149,7 +158,7 @@ extract_touched_files () {
     sudo rm -rf $initrd/usr/include
     sudo rm -rf $initrd/usr/share/cursors
     sudo rm -rf $initrd/usr/share/icons
-    #sudo rm -rf $initrd/usr/lib/llvm
+    sudo rm -rf $initrd/usr/lib/llvm
     sudo rm -rf $initrd/usr/lib64/librsvg-2.so.2.48.0
     sudo rm -rf $initrd/etc/udev/hwdb.d
     sudo rm -rf $initrd/etc/udev/hwdb.bin
@@ -182,7 +191,10 @@ install_rinit () {
 
 run_initrd () {
     pushd $firebox_path/work
-    qemu-system-x86_64 -kernel linux/arch/x86/boot/bzImage -initrd firebox_initrd.zstd -m 2G -serial mon:stdio -nic bridge,id=br0 -smp 4 -machine type=q35,accel=kvm -append "console=ttyS0" -display gtk,gl=on -device virtio-vga-gl
+    qemu-system-x86_64 -kernel linux/arch/x86/boot/bzImage -initrd firebox_initrd.zstd -m 2G -serial mon:stdio -nic bridge,id=br0 \
+                       -smp 4 -machine type=q35,accel=kvm -append "console=ttyS0" \
+                       -display gtk,gl=on
+
     popd
 }
 
@@ -192,6 +204,36 @@ save_kernel_config () {
     cp defconfig ../../configs
     popd
 }
+
+gen_tiny_initrd () {
+    local tiny_initrd
+    tiny_initrd=$firebox_path/work/tiny_initrd
+    sudo rm -rf $firebox_path/work/tiny_initrd
+    make -C $firebox_path/busybox || return 1
+
+    pushd $firebox_path/tools/rinit
+    cargo build --release || return 1
+    popd
+
+    sudo mkdir -p $tiny_initrd/dev
+    sudo mkdir -p $tiny_initrd/proc
+    sudo mkdir -p $tiny_initrd/sys
+    sudo mkdir -p $tiny_initrd/tmp
+    sudo mkdir -p $tiny_initrd/run
+    sudo mkdir -p $tiny_initrd/bin
+
+    sudo cp $firebox_path/tools/rinit/target/release/rinit $tiny_initrd/init
+    sudo cp $firebox_path/busybox/busybox $tiny_initrd/bin/busybox
+    sudo ln -s /bin/busybox $tiny_initrd/bin/sh
+    sudo ln -s /bin/busybox $tiny_initrd/bin/tree
+    sudo ln -s /bin/busybox $tiny_initrd/bin/cat
+    sudo ln -s /bin/busybox $tiny_initrd/bin/ls
+
+    pushd $tiny_initrd
+    sudo find -print0 | sudo cpio -0 -o -H newc | zstd -9 > $firebox_path/work/tiny_initrd.zstd
+    popd
+}
+
 
 echo "firebox_path = $firebox_path"
 
